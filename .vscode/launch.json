@@ -1,0 +1,45 @@
+{
+    // Verwendet IntelliSense zum Ermitteln möglicher Attribute.
+    // Zeigen Sie auf vorhandene Attribute, um die zugehörigen Beschreibungen anzuzeigen.
+    // Weitere Informationen finden Sie unter https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'axum_crud_api'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=axum_crud_api",
+                    "--package=axum_crud_api"
+                ],
+                "filter": {
+                    "name": "axum_crud_api",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'axum_crud_api'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=axum_crud_api",
+                    "--package=axum_crud_api"
+                ],
+                "filter": {
+                    "name": "axum_crud_api",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
