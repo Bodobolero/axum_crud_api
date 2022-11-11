@@ -8,6 +8,16 @@ use sqlx::SqlitePool;
 
 use crate::models::task;
 
+/// List all Tasks
+///
+/// List all Tasks in database
+#[utoipa::path(
+        get,
+        path = "/tasks",
+        responses(
+            (status = 200, description = "List all tasks successfully", body = [Task])
+        )
+    )]
 pub async fn all_tasks(Extension(pool): Extension<SqlitePool>) -> impl IntoResponse {
     let sql = "SELECT id, task FROM task ".to_string();
 
@@ -19,6 +29,17 @@ pub async fn all_tasks(Extension(pool): Extension<SqlitePool>) -> impl IntoRespo
     (StatusCode::OK, Json(task))
 }
 
+/// Create new Task
+///
+/// Tries to create a new Task in the database
+#[utoipa::path(
+        post,
+        path = "/task",
+        request_body = NewTask,
+        responses(
+            (status = 200, description = "Task created successfully", body = Task),
+        )
+    )]
 pub async fn new_task(
     Json(task): Json<task::NewTask>,
     Extension(pool): Extension<SqlitePool>,
@@ -34,6 +55,20 @@ pub async fn new_task(
     (StatusCode::OK, Json(task))
 }
 
+/// Get task by id
+///
+/// Return task by given id. Return only status 200 on success or 404 if Todo is not found.
+#[utoipa::path(
+        get,
+        path = "/task/{id}",
+        responses(
+            (status = 200, description = "Task returned successfully"),
+            (status = 404, description = "Task not found")
+        ),
+        params(
+            ("id" = i32, Path, description = "Task database id")
+        )
+    )]
 pub async fn task(
     Path(id): Path<i32>,
     Extension(pool): Extension<SqlitePool>,
@@ -49,6 +84,25 @@ pub async fn task(
     (StatusCode::OK, Json(task))
 }
 
+/// Update Task with new description by id
+///
+/// Update Task with id
+#[utoipa::path(
+        put,
+        path = "/task/{id}",
+        request_body = UpdateTask,
+        responses(
+            (status = 200, description = "Task updated successfully"),
+            (status = 404, description = "Task was not found"),
+        ),
+        params(
+            ("id" = i32, Path, description = "Todo database id")
+        ),
+        security(
+            (), // <-- make optional authentication
+            ("api_key" = [])
+        )
+    )]
 pub async fn update_task(
     Path(id): Path<i32>,
     Json(task): Json<task::UpdateTask>,
@@ -64,6 +118,20 @@ pub async fn update_task(
     (StatusCode::OK, Json(task))
 }
 
+/// Delete Task by id
+///
+/// Delete Task from database by id. Returns either 200 success of 404 with TodoError if Todo is not found.
+#[utoipa::path(
+        delete,
+        path = "/task/{id}",
+        responses(
+            (status = 200, description = "Task was deleted"),
+            (status = 404, description = "Task was not found"),
+              ),
+        params(
+            ("id" = i32, Path, description = "Task database id")
+        ),
+    )]
 pub async fn delete_task(
     Path(id): Path<i32>,
     Extension(pool): Extension<SqlitePool>,

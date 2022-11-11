@@ -15,3 +15,7 @@ sqlx = { version = "0.6", features = ["runtime-tokio-native-tls", "json", "sqlit
 anyhow = "1.0.66"
 serde_json = "1.0.87"
 tower-http = { version = "0.3.4", features = ["trace"] }
+# swagger openapi doc
+utoipa = { version = "2.3.0", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "2", features = ["axum"] }
+

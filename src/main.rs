@@ -20,8 +20,33 @@ use sqlx::sqlite::SqlitePoolOptions;
 mod controllers;
 mod models;
 
+// openAPI doc
+use utoipa::{
+    OpenApi,
+};
+use utoipa_swagger_ui::SwaggerUi;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+   
+    #[derive(OpenApi)]
+    #[openapi(
+        paths(
+            controllers::task::all_tasks,
+            controllers::task::new_task,
+            controllers::task::task,
+            controllers::task::update_task,
+            controllers::task::delete_task,
+            
+        ),
+        components(
+            schemas(models::task::Task,models::task::NewTask, models::task::UpdateTask)
+        ),
+        tags(
+            (name = "task", description = "Tasks management API")
+        )
+    )]
+    struct ApiDoc;
     // sqlx-sqlite database pool
     use std::env;
     let database_url = env::var("DATABASE_URL").unwrap_or("sqlite:tasks.db".to_string());
@@ -42,6 +67,8 @@ async fn main() -> anyhow::Result<()> {
 
     // build our application with a route
     let app = Router::new()
+         // openAPI doc under: http://127.0.0.1:3000/swagger-ui
+        .merge(SwaggerUi::new("/swagger-ui/*tail").url("/api-doc/openapi.json", ApiDoc::openapi()))
         .route("/hello", get(root))
         .route("/tasks", get(controllers::task::all_tasks))
         .route("/task", post(controllers::task::new_task))
