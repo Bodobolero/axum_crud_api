@@ -38,6 +38,7 @@ pub async fn all_tasks(Extension(pool): Extension<SqlitePool>) -> impl IntoRespo
         request_body = NewTask,
         responses(
             (status = 200, description = "Task created successfully", body = Task),
+            (status = 500, description = "Task could not be created", body = Task),
         )
     )]
 pub async fn new_task(
@@ -46,13 +47,15 @@ pub async fn new_task(
 ) -> impl IntoResponse {
     let sql = "INSERT INTO task (task) values ($1)";
 
-    let _ = sqlx::query(&sql)
-        .bind(&task.task)
-        .execute(&pool)
-        .await
-        .unwrap();
+    let result = sqlx::query(&sql).bind(&task.task).execute(&pool).await;
 
-    (StatusCode::OK, Json(task))
+    match result {
+        Ok(_) => (StatusCode::OK, Json(task)),
+        Err(err) => {
+            tracing::error!("could not create task. error: {:?}", err);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(task))
+        }
+    }
 }
 
 /// Get task by id
@@ -77,22 +80,20 @@ pub async fn task(
 
     let result: Result<task::Task, sqlx::Error> =
         sqlx::query_as(&sql).bind(id).fetch_one(&pool).await;
-    if let Ok(task) = result {
-        return (StatusCode::OK, Json(task));
-    }
 
-    tracing::error!(
-        "could not find task with id: {:?} error: {:?}",
-        id,
-        result.err()
-    );
-    (
-        StatusCode::NOT_FOUND,
-        Json(task::Task {
-            id,
-            task: "".to_string(),
-        }),
-    )
+    match result {
+        Ok(task) => (StatusCode::OK, Json(task)),
+        Err(err) => {
+            tracing::error!("could not find task with id: {:?} error: {:?}", id, err);
+            (
+                StatusCode::NOT_FOUND,
+                Json(task::Task {
+                    id,
+                    task: "".to_string(),
+                }),
+            )
+        }
+    }
 }
 
 /// Update Task with new description by id
@@ -107,7 +108,7 @@ pub async fn task(
             (status = 404, description = "Task was not found"),
         ),
         params(
-            ("id" = i64, Path, description = "Todo database id")
+            ("id" = i64, Path, description = "Task database id")
         ),
         security(
             (), // <-- make optional authentication
@@ -125,11 +126,16 @@ pub async fn update_task(
         .execute(&pool)
         .await
     {
+        Ok(queryresult) => {
+            match queryresult.rows_affected() {
+                1 => return (StatusCode::OK, Json(task)),
+                _ => return (StatusCode::NOT_FOUND, Json(task)),
+            };
+        }
         Err(e) => {
             tracing::error!("could not find task with id: {:?} error: {:?}", id, e);
             (StatusCode::NOT_FOUND, Json(task))
         }
-        Ok(_) => (StatusCode::OK, Json(task)),
     }
 }
 
@@ -151,11 +157,28 @@ pub async fn delete_task(
     Path(id): Path<i64>,
     Extension(pool): Extension<SqlitePool>,
 ) -> impl IntoResponse {
-    sqlx::query("DELETE FROM task WHERE id=$1")
+    match sqlx::query("DELETE FROM task WHERE id=$1")
         .bind(id)
         .execute(&pool)
         .await
-        .unwrap();
-
-    (StatusCode::OK, Json(json!({"msg": "Task Deleted"})))
+    {
+        Ok(queryresult) => {
+            match queryresult.rows_affected() {
+                1 => return (StatusCode::OK, Json(json!({"msg": "Task Deleted"}))),
+                _ => {
+                    return (
+                        StatusCode::NOT_FOUND,
+                        Json(json!({"msg": "task not found"})),
+                    )
+                }
+            };
+        }
+        Err(e) => {
+            tracing::error!("could not find task with id: {:?} error: {:?}", id, e);
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({"msg": "task not found"})),
+            )
+        }
+    }
 }
