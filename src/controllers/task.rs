@@ -75,13 +75,24 @@ pub async fn task(
 ) -> impl IntoResponse {
     let sql = "SELECT * FROM task where id=$1".to_string();
 
-    let task: task::Task = sqlx::query_as(&sql)
-        .bind(id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let result: Result<task::Task, sqlx::Error> =
+        sqlx::query_as(&sql).bind(id).fetch_one(&pool).await;
+    if let Ok(task) = result {
+        return (StatusCode::OK, Json(task));
+    }
 
-    (StatusCode::OK, Json(task))
+    tracing::error!(
+        "could not find task with id: {:?} error: {:?}",
+        id,
+        result.err()
+    );
+    (
+        StatusCode::NOT_FOUND,
+        Json(task::Task {
+            id,
+            task: "".to_string(),
+        }),
+    )
 }
 
 /// Update Task with new description by id
@@ -108,14 +119,18 @@ pub async fn update_task(
     Json(task): Json<task::UpdateTask>,
     Extension(pool): Extension<SqlitePool>,
 ) -> impl IntoResponse {
-    sqlx::query("UPDATE task SET task=$1 WHERE id=$2")
+    match sqlx::query("UPDATE task SET task=$1 WHERE id=$2")
         .bind(&task.task)
         .bind(id)
         .execute(&pool)
         .await
-        .unwrap();
-
-    (StatusCode::OK, Json(task))
+    {
+        Err(e) => {
+            tracing::error!("could not find task with id: {:?} error: {:?}", id, e);
+            (StatusCode::NOT_FOUND, Json(task))
+        }
+        Ok(_) => (StatusCode::OK, Json(task)),
+    }
 }
 
 /// Delete Task by id
