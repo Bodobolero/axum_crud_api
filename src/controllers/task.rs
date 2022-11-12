@@ -66,11 +66,11 @@ pub async fn new_task(
             (status = 404, description = "Task not found")
         ),
         params(
-            ("id" = i32, Path, description = "Task database id")
+            ("id" = i64, Path, description = "Task database id")
         )
     )]
 pub async fn task(
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
     Extension(pool): Extension<SqlitePool>,
 ) -> impl IntoResponse {
     let sql = "SELECT * FROM task where id=$1".to_string();
@@ -96,7 +96,7 @@ pub async fn task(
             (status = 404, description = "Task was not found"),
         ),
         params(
-            ("id" = i32, Path, description = "Todo database id")
+            ("id" = i64, Path, description = "Todo database id")
         ),
         security(
             (), // <-- make optional authentication
@@ -104,7 +104,7 @@ pub async fn task(
         )
     )]
 pub async fn update_task(
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
     Json(task): Json<task::UpdateTask>,
     Extension(pool): Extension<SqlitePool>,
 ) -> impl IntoResponse {
@@ -129,11 +129,11 @@ pub async fn update_task(
             (status = 404, description = "Task was not found"),
               ),
         params(
-            ("id" = i32, Path, description = "Task database id")
+            ("id" = i64, Path, description = "Task database id")
         ),
     )]
 pub async fn delete_task(
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
     Extension(pool): Extension<SqlitePool>,
 ) -> impl IntoResponse {
     sqlx::query("DELETE FROM task WHERE id=$1")
