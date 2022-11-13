@@ -53,6 +53,8 @@ pub async fn new_task(
     Json(task): Json<task::NewTask>,
     Extension(pool): Extension<SqlitePool>,
 ) -> impl IntoResponse {
+    // we use "RETURNING" - non-standard SQL syntax (which is supported by sqlite and postgres) to return the new ID created by the database
+    // to our caller
     let sql = "INSERT INTO task (task) values ($1) RETURNING *";
 
     let result: Result<task::Task, sqlx::Error> =
