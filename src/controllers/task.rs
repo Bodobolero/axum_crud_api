@@ -53,15 +53,22 @@ pub async fn new_task(
     Json(task): Json<task::NewTask>,
     Extension(pool): Extension<SqlitePool>,
 ) -> impl IntoResponse {
-    let sql = "INSERT INTO task (task) values ($1)";
+    let sql = "INSERT INTO task (task) values ($1) RETURNING *";
 
-    let result = sqlx::query(&sql).bind(&task.task).execute(&pool).await;
+    let result: Result<task::Task, sqlx::Error> =
+        sqlx::query_as(&sql).bind(&task.task).fetch_one(&pool).await;
 
     match result {
-        Ok(_) => (StatusCode::OK, Json(task)),
+        Ok(taskwithid) => (StatusCode::OK, Json(taskwithid)),
         Err(err) => {
             tracing::error!("could not create task. error: {:?}", err);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(task))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(task::Task {
+                    id: 0,
+                    task: "".to_string(),
+                }),
+            )
         }
     }
 }
