@@ -20,7 +20,7 @@ use crate::models::task;
         )
     )]
 pub async fn all_tasks(Extension(pool): Extension<SqlitePool>) -> impl IntoResponse {
-    let sql = "SELECT id, task FROM task ".to_string();
+    let sql = "SELECT ids, task FROM task ".to_string();
 
     let result: Result<Vec<task::Task>, sqlx::Error> =
         sqlx::query_as::<_, task::Task>(&sql).fetch_all(&pool).await;
