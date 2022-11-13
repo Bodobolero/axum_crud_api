@@ -15,18 +15,26 @@ use crate::models::task;
         get,
         path = "/tasks",
         responses(
-            (status = 200, description = "List all tasks successfully", body = [Task])
+            (status = 200, description = "List all tasks successfully", body = [Task]),
+            (status = 500, description = "Internal server error when retrieving list of all tasks", body = [Task])
         )
     )]
 pub async fn all_tasks(Extension(pool): Extension<SqlitePool>) -> impl IntoResponse {
     let sql = "SELECT id, task FROM task ".to_string();
 
-    let task = sqlx::query_as::<_, task::Task>(&sql)
-        .fetch_all(&pool)
-        .await
-        .unwrap();
+    let result: Result<Vec<task::Task>, sqlx::Error> =
+        sqlx::query_as::<_, task::Task>(&sql).fetch_all(&pool).await;
 
-    (StatusCode::OK, Json(task))
+    match result {
+        Ok(tasks) => (StatusCode::OK, Json(tasks)),
+        Err(err) => {
+            tracing::error!("error retrieving tasks: {:?}", err);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(Vec::<task::Task>::new()),
+            )
+        }
+    }
 }
 
 /// Create new Task
@@ -37,7 +45,7 @@ pub async fn all_tasks(Extension(pool): Extension<SqlitePool>) -> impl IntoRespo
         path = "/task",
         request_body = NewTask,
         responses(
-            (status = 200, description = "Task created successfully", body = Task),
+            (status = 201, description = "Task created successfully", body = Task),
             (status = 500, description = "Task could not be created", body = Task),
         )
     )]
