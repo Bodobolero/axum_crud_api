@@ -71,10 +71,10 @@ async fn main() -> anyhow::Result<()> {
         .merge(SwaggerUi::new("/swagger-ui/*tail").url("/api-doc/openapi.json", ApiDoc::openapi()))
         .route("/hello", get(root))
         .route("/tasks", get(controllers::task::all_tasks))
-        .route("/task", post(controllers::task::new_task))
-        .route("/task/:id", get(controllers::task::task))
-        .route("/task/:id", put(controllers::task::update_task))
-        .route("/task/:id", delete(controllers::task::delete_task))
+        .route("/tasks", post(controllers::task::new_task))
+        .route("/tasks/:id", get(controllers::task::task))
+        .route("/tasks/:id", put(controllers::task::update_task))
+        .route("/tasks/:id", delete(controllers::task::delete_task))
         .layer(Extension(pool))
         .layer(TraceLayer::new_for_http());
 
