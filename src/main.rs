@@ -1,8 +1,15 @@
 //! Run with
 //!
 //! ```not_rust
-//! cd examples && cargo run -p example-hello-world
+//! cargo run --release
 //! ```
+//! 
+//! To run integration tests (using testtasks.db) run with
+//! 
+//! ```not_rust
+//! cargo test
+//! ```
+//! 
 
 use axum::{
     extract::Extension,
@@ -91,10 +98,22 @@ fn init_tracing(){
         .init();
 }
 
+/** Create database "tasks.db" in current directory if it does not exist.
+   Create schema (invoke migrations).
+   Return a database pool.
+   In test configuration uses database name "testtasks.db" instead
+ */
 async fn prepare_database() -> anyhow::Result<Pool<Sqlite>> {
     // sqlx-sqlite database pool
     use std::env;
-    let database_url = env::var("DATABASE_URL").unwrap_or("sqlite:tasks.db".to_string());
+
+    
+    let database_url = env::var("DATABASE_URL").unwrap_or(if cfg!(test) {
+        "sqlite:testtasks.db"
+    } else {
+        "sqlite:tasks.db"
+    }.to_string());
+    
 
     // create database if it does not exist 
     let conn = SqliteConnectOptions::from_str(&database_url)?
