@@ -7,8 +7,10 @@
 //! To run integration tests (using testtasks.db) run with
 //! 
 //! ```not_rust
-//! cargo test
+//! cargo test -- --test-threads=1
 //! ```
+//! 
+//! Note: since our database IS stateful we need to run one test at a time
 //! 
 
 use axum::{
@@ -25,6 +27,7 @@ use anyhow::Context;
 use sqlx::{Pool, Sqlite, sqlite::{SqlitePoolOptions, SqliteConnectOptions, SqliteJournalMode}, ConnectOptions};
 use sqlx::Connection;
 use std::str::FromStr;
+use std::env;
 
 mod controllers;
 mod models;
@@ -32,8 +35,16 @@ mod models;
 #[cfg(test)]
 mod tests;
 #[macro_use]
-#[cfg(test)]
 extern crate lazy_static;
+
+
+lazy_static! {    
+    pub static ref DATABASE_URL: String = env::var("DATABASE_URL").unwrap_or(if cfg!(test) {
+        "sqlite:testtasks.db"
+    } else {
+        "sqlite:tasks.db"
+    }.to_string());
+}
 
 // openAPI doc
 use utoipa::{
@@ -111,23 +122,13 @@ fn init_tracing(){
 
 /** Create database "tasks.db" in current directory if it does not exist.
    Create schema (invoke migrations).
-   Return a database pool.
+   Return a database pool (sqlx - sqlite)
    In test configuration uses database name "testtasks.db" instead
  */
 async fn prepare_database() -> anyhow::Result<Pool<Sqlite>> {
-    // sqlx-sqlite database pool
-    use std::env;
-
     
-    let database_url = env::var("DATABASE_URL").unwrap_or(if cfg!(test) {
-        "sqlite:testtasks.db"
-    } else {
-        "sqlite:tasks.db"
-    }.to_string());
-    
-
     // create database if it does not exist 
-    let conn = SqliteConnectOptions::from_str(&database_url)?
+    let conn = SqliteConnectOptions::from_str(&DATABASE_URL)?
     .journal_mode(SqliteJournalMode::Wal).create_if_missing(true)
     .connect().await?;
     conn.close();
@@ -135,18 +136,14 @@ async fn prepare_database() -> anyhow::Result<Pool<Sqlite>> {
     // prepare connection pool
     let pool = SqlitePoolOptions::new()
         .max_connections(50)
-        .connect(&database_url)
+        .connect(&DATABASE_URL)
         .await
         .context("could not connect to database_url")?;
 
     // prepare schema in db if it does not yet exist
     sqlx::migrate!().run(&pool).await?;
 
-    // tabula rasa for reentrant tests
-    #[cfg(test)]
-    sqlx::query("DELETE FROM task")
-        .execute(&pool)
-        .await?;
+    
 
     Ok(pool)
 }
