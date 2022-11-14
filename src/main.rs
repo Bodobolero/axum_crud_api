@@ -15,7 +15,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 // sqlx
 use anyhow::Context;
-use sqlx::{sqlite::{SqlitePoolOptions, SqliteConnectOptions, SqliteJournalMode}, ConnectOptions};
+use sqlx::{Pool, Sqlite, sqlite::{SqlitePoolOptions, SqliteConnectOptions, SqliteJournalMode}, ConnectOptions};
 use sqlx::Connection;
 use std::str::FromStr;
 
@@ -50,35 +50,9 @@ async fn main() -> anyhow::Result<()> {
     )]
     struct ApiDoc;
 
-    // initialize tracing
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("tower_http=debug,axum_crud_api=debug")
-                .unwrap_or_else(|_| "axum_crud_api=debug,tower_http=debug".into()),
-        ))
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-
-    // sqlx-sqlite database pool
-    use std::env;
-    let database_url = env::var("DATABASE_URL").unwrap_or("sqlite:tasks.db".to_string());
+    init_tracing();
     
-    // prepare database
-    // create database if it does not exist 
-    let conn = SqliteConnectOptions::from_str(&database_url)?
-    .journal_mode(SqliteJournalMode::Wal).create_if_missing(true)
-    .connect().await?;
-    conn.close();
-
-    // prepare connection pool
-    let pool = SqlitePoolOptions::new()
-        .max_connections(50)
-        .connect(&database_url)
-        .await
-        .context("could not connect to database_url")?;
-
-    // prepare schema in db if it does not yet exist
-    sqlx::migrate!().run(&pool).await?;
+    let pool = prepare_database().await?;
 
     // build our application with a route
     let app = Router::new()
@@ -105,4 +79,38 @@ async fn main() -> anyhow::Result<()> {
 
 async fn root() -> &'static str {
     "Hello, World"
+}
+
+fn init_tracing(){
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(
+            std::env::var("tower_http=debug,axum_crud_api=debug")
+                .unwrap_or_else(|_| "axum_crud_api=debug,tower_http=debug".into()),
+        ))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+}
+
+async fn prepare_database() -> anyhow::Result<Pool<Sqlite>> {
+    // sqlx-sqlite database pool
+    use std::env;
+    let database_url = env::var("DATABASE_URL").unwrap_or("sqlite:tasks.db".to_string());
+
+    // create database if it does not exist 
+    let conn = SqliteConnectOptions::from_str(&database_url)?
+    .journal_mode(SqliteJournalMode::Wal).create_if_missing(true)
+    .connect().await?;
+    conn.close();
+
+    // prepare connection pool
+    let pool = SqlitePoolOptions::new()
+        .max_connections(50)
+        .connect(&database_url)
+        .await
+        .context("could not connect to database_url")?;
+
+    // prepare schema in db if it does not yet exist
+    sqlx::migrate!().run(&pool).await?;
+
+    Ok(pool)
 }
