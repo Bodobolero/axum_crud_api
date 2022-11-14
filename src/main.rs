@@ -110,11 +110,16 @@ async fn root() -> &'static str {
     "Hello, World"
 }
 
+
 fn init_tracing(){
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
             std::env::var("tower_http=debug,axum_crud_api=debug")
-                .unwrap_or_else(|_| "axum_crud_api=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| if cfg!(test) {
+                    "tower_http=error"
+                } else {
+                    "axum_crud_api=debug,tower_http=debug"
+                }.into()),
         ))
         .with(tracing_subscriber::fmt::layer())
         .init();

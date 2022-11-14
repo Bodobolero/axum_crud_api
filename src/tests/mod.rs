@@ -15,6 +15,9 @@ mod mock;
 const TEST_HOST: &str = "http://127.0.0.1:3000";
 const POST_TASK_URI: &str = "/tasks";
 const GET_TASKS_URI: &str = "/tasks";
+const DELETE_TASK_URI: &str = "/tasks/";
+const PUT_TASK_URI: &str = "/tasks/";
+const GET_TASK_URI: &str = "/tasks/";
 
 // we use a single instance of Server which has the shared state in the sqlite database
 // and we need to make sure that only one testcase locks this resource
@@ -87,6 +90,35 @@ async fn test_create_one_task_and_list_tasks_e2e() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
+async fn test_create_one_task_and_get_task_e2e() -> anyhow::Result<()> {
+    let mut locked_server: OwnedMutexGuard<Server> = SERVER.clone().lock_owned().await;
+    init_and_lock_real_server(&mut locked_server).await?;
+    let http_client = http_client();
+
+    let req = Request::builder()
+        .method(Method::POST)
+        .header(hyper::header::CONTENT_TYPE, "application/json")
+        .uri(TEST_HOST.to_string() + POST_TASK_URI)
+        .body(Body::from(r#"{"task":"my first test task"}"#))
+        .unwrap();
+    let resp = http_client.request(req).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let body_bytes = to_bytes(resp.into_body()).await.unwrap();
+    assert_eq!(body_bytes, r#"{"id":1,"task":"my first test task"}"#);
+
+    let req = Request::builder()
+        .method(Method::GET)
+        .uri(TEST_HOST.to_string() + GET_TASK_URI + "1")
+        .body(Body::empty())
+        .unwrap();
+    let resp = http_client.request(req).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body_bytes = to_bytes(resp.into_body()).await.unwrap();
+    assert_eq!(body_bytes, r#"{"id":1,"task":"my first test task"}"#);
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_create_two_tasks_and_list_tasks_e2e() -> anyhow::Result<()> {
     let mut locked_server: OwnedMutexGuard<Server> = SERVER.clone().lock_owned().await;
     init_and_lock_real_server(&mut locked_server).await?;
@@ -143,5 +175,131 @@ async fn test_list_empty_tasks_e2e() -> anyhow::Result<()> {
     assert_eq!(resp.status(), 200);
     let body_bytes = to_bytes(resp.into_body()).await.unwrap();
     assert_eq!(body_bytes, r#"[]"#);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_create_and_delete_one_task_and_list_tasks_e2e() -> anyhow::Result<()> {
+    let mut locked_server: OwnedMutexGuard<Server> = SERVER.clone().lock_owned().await;
+    init_and_lock_real_server(&mut locked_server).await?;
+    let http_client = http_client();
+
+    let req = Request::builder()
+        .method(Method::POST)
+        .header(hyper::header::CONTENT_TYPE, "application/json")
+        .uri(TEST_HOST.to_string() + POST_TASK_URI)
+        .body(Body::from(r#"{"task":"my first test task"}"#))
+        .unwrap();
+    let resp = http_client.request(req).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let body_bytes = to_bytes(resp.into_body()).await.unwrap();
+    assert_eq!(body_bytes, r#"{"id":1,"task":"my first test task"}"#);
+
+    let req = Request::builder()
+        .method(Method::DELETE)
+        .uri(TEST_HOST.to_string() + DELETE_TASK_URI + "1")
+        .body(Body::empty())
+        .unwrap();
+    let resp = http_client.request(req).await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let req = Request::builder()
+        .method(Method::GET)
+        .uri(TEST_HOST.to_string() + GET_TASKS_URI)
+        .body(Body::empty())
+        .unwrap();
+    let resp = http_client.request(req).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body_bytes = to_bytes(resp.into_body()).await.unwrap();
+    assert_eq!(body_bytes, r#"[]"#);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_create_and_update_one_task_and_list_tasks_e2e() -> anyhow::Result<()> {
+    let mut locked_server: OwnedMutexGuard<Server> = SERVER.clone().lock_owned().await;
+    init_and_lock_real_server(&mut locked_server).await?;
+    let http_client = http_client();
+
+    let req = Request::builder()
+        .method(Method::POST)
+        .header(hyper::header::CONTENT_TYPE, "application/json")
+        .uri(TEST_HOST.to_string() + POST_TASK_URI)
+        .body(Body::from(r#"{"task":"my first test task"}"#))
+        .unwrap();
+    let resp = http_client.request(req).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let body_bytes = to_bytes(resp.into_body()).await.unwrap();
+    assert_eq!(body_bytes, r#"{"id":1,"task":"my first test task"}"#);
+
+    let req = Request::builder()
+        .method(Method::PUT)
+        .header(hyper::header::CONTENT_TYPE, "application/json")
+        .uri(TEST_HOST.to_string() + PUT_TASK_URI + "1")
+        .body(Body::from(r#"{"task":"my first updated test task"}"#))
+        .unwrap();
+    let resp = http_client.request(req).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body_bytes = to_bytes(resp.into_body()).await.unwrap();
+    assert_eq!(body_bytes, r#"{"task":"my first updated test task"}"#);
+
+    let req = Request::builder()
+        .method(Method::GET)
+        .uri(TEST_HOST.to_string() + GET_TASKS_URI)
+        .body(Body::empty())
+        .unwrap();
+    let resp = http_client.request(req).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body_bytes = to_bytes(resp.into_body()).await.unwrap();
+    assert_eq!(
+        body_bytes,
+        r#"[{"id":1,"task":"my first updated test task"}]"#
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_wrong_task_e2e() -> anyhow::Result<()> {
+    let mut locked_server: OwnedMutexGuard<Server> = SERVER.clone().lock_owned().await;
+    init_and_lock_real_server(&mut locked_server).await?;
+    let http_client = http_client();
+    let req = Request::builder()
+        .method(Method::GET)
+        .uri(TEST_HOST.to_string() + GET_TASK_URI + "4711")
+        .body(Body::empty())
+        .unwrap();
+    let resp = http_client.request(req).await.unwrap();
+    assert_eq!(resp.status(), 404);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_delete_wrong_task_e2e() -> anyhow::Result<()> {
+    let mut locked_server: OwnedMutexGuard<Server> = SERVER.clone().lock_owned().await;
+    init_and_lock_real_server(&mut locked_server).await?;
+    let http_client = http_client();
+    let req = Request::builder()
+        .method(Method::DELETE)
+        .uri(TEST_HOST.to_string() + DELETE_TASK_URI + "4711")
+        .body(Body::empty())
+        .unwrap();
+    let resp = http_client.request(req).await.unwrap();
+    assert_eq!(resp.status(), 404);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_update_wrong_task_e2e() -> anyhow::Result<()> {
+    let mut locked_server: OwnedMutexGuard<Server> = SERVER.clone().lock_owned().await;
+    init_and_lock_real_server(&mut locked_server).await?;
+    let http_client = http_client();
+    let req = Request::builder()
+        .method(Method::PUT)
+        .header(hyper::header::CONTENT_TYPE, "application/json")
+        .uri(TEST_HOST.to_string() + PUT_TASK_URI + "4711")
+        .body(Body::from(r#"{"task":"my first updated test task"}"#))
+        .unwrap();
+    let resp = http_client.request(req).await.unwrap();
+    assert_eq!(resp.status(), 404);
     Ok(())
 }
