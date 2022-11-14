@@ -62,7 +62,7 @@ pub async fn new_task(
 
     match result {
         Ok(taskwithid) => (
-            StatusCode::OK,
+            StatusCode::CREATED,
             [("Location", format!("/tasks/{:?}", taskwithid.id))],
             Json(taskwithid),
         ),

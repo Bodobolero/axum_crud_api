@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 axum = "0.5.17"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["full", "time"] }
 serde = "1.0.147"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"]}
@@ -19,3 +19,7 @@ tower-http = { version = "0.3.4", features = ["trace"] }
 utoipa = { version = "2.3.0", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "2", features = ["axum"] }
 
+[dev-dependencies]
+lazy_static = "=1.4.0"
+hyper = "0.14"
+hyper-tls = "0.5"

@@ -29,6 +29,12 @@ use std::str::FromStr;
 mod controllers;
 mod models;
 
+#[cfg(test)]
+mod tests;
+#[macro_use]
+#[cfg(test)]
+extern crate lazy_static;
+
 // openAPI doc
 use utoipa::{
     OpenApi,
@@ -37,7 +43,12 @@ use utoipa_swagger_ui::SwaggerUi;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-   
+    run().await?;
+    Ok(())
+}
+
+// we extract main logic into run to re-use it in testcases
+async fn run() -> anyhow::Result<()>{
     #[derive(OpenApi)]
     #[openapi(
         paths(
@@ -130,6 +141,12 @@ async fn prepare_database() -> anyhow::Result<Pool<Sqlite>> {
 
     // prepare schema in db if it does not yet exist
     sqlx::migrate!().run(&pool).await?;
+
+    // tabula rasa for reentrant tests
+    #[cfg(test)]
+    sqlx::query("DELETE FROM task")
+        .execute(&pool)
+        .await?;
 
     Ok(pool)
 }
