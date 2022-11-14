@@ -7,7 +7,8 @@ use sqlx::{
     ConnectOptions,
 };
 use std::str::FromStr;
-use std::sync::RwLock;
+use std::sync::Arc;
+use tokio::sync::{Mutex, OwnedMutexGuard};
 
 mod mock;
 
@@ -15,10 +16,24 @@ const TEST_HOST: &str = "http://127.0.0.1:3000";
 const POST_TASK_URI: &str = "/tasks";
 const GET_TASKS_URI: &str = "/tasks";
 
+// we use a single instance of Server which has the shared state in the sqlite database
+// and we need to make sure that only one testcase locks this resource
+// as long as the testcase runs - otherwise the results of list tasks and the
+// assigned ids (primary key in sqlite) will not be reliable and the tests may fail
+// so each testcase has to use
+// let mut locked_server: OwnedMutexGuard<Server> = SERVER.clone().lock_owned().await;
+// init_and_lock_real_server(&mut locked_server).await?;
 lazy_static! {
-    static ref SERVER: RwLock<Server> = RwLock::new(Server::new());
+    static ref SERVER: Arc<Mutex<Server>> = Arc::new(Mutex::new(Server::new()));
 }
 
+/**
+ * Create a defined state in the database by deleting all tasks.
+ * Here we rely on sqlite delete truncate optimization - which
+ * also resets the primary key id.
+ * Note: because all testcases share the same database we cannot
+ * run the tests in parallel.
+ */
 async fn delete_all_tasks() -> anyhow::Result<()> {
     // tabula rasa for reentrant tests
     let mut conn = SqliteConnectOptions::from_str(&crate::DATABASE_URL)?
@@ -31,9 +46,9 @@ async fn delete_all_tasks() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn init_real_server() -> anyhow::Result<()> {
+async fn init_and_lock_real_server(server: &mut OwnedMutexGuard<Server>) -> anyhow::Result<()> {
+    server.init_server().await;
     delete_all_tasks().await?;
-    SERVER.write().unwrap().init_server().await;
     Ok(())
 }
 
@@ -44,7 +59,8 @@ fn http_client() -> HyperClient<HttpsConnector<HttpConnector>> {
 
 #[tokio::test]
 async fn test_create_one_task_and_list_tasks_e2e() -> anyhow::Result<()> {
-    init_real_server().await?;
+    let mut locked_server: OwnedMutexGuard<Server> = SERVER.clone().lock_owned().await;
+    init_and_lock_real_server(&mut locked_server).await?;
     let http_client = http_client();
 
     let req = Request::builder()
@@ -72,7 +88,8 @@ async fn test_create_one_task_and_list_tasks_e2e() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_create_two_tasks_and_list_tasks_e2e() -> anyhow::Result<()> {
-    init_real_server().await?;
+    let mut locked_server: OwnedMutexGuard<Server> = SERVER.clone().lock_owned().await;
+    init_and_lock_real_server(&mut locked_server).await?;
     let http_client = http_client();
 
     let req = Request::builder()
@@ -114,7 +131,8 @@ async fn test_create_two_tasks_and_list_tasks_e2e() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_list_empty_tasks_e2e() -> anyhow::Result<()> {
-    init_real_server().await?;
+    let mut locked_server: OwnedMutexGuard<Server> = SERVER.clone().lock_owned().await;
+    init_and_lock_real_server(&mut locked_server).await?;
     let http_client = http_client();
     let req = Request::builder()
         .method(Method::GET)

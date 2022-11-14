@@ -7,11 +7,11 @@
 //! To run integration tests (using testtasks.db) run with
 //! 
 //! ```not_rust
-//! cargo test -- --test-threads=1
+//! cargo test 
 //! ```
 //! 
 //! Note: since our database IS stateful we need to run one test at a time
-//! 
+//! which we implement by locking a tokio::sync::Mutex and holding a tokio::sync::MutexGuard for the lifetime of each test
 
 use axum::{
     extract::Extension,
