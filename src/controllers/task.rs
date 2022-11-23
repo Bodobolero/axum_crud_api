@@ -149,9 +149,9 @@ pub async fn update_task(
         .await
     {
         Ok(queryresult) => {
-            match queryresult.rows_affected() {
-                1 => return (StatusCode::OK, Json(task)),
-                _ => return (StatusCode::NOT_FOUND, Json(task)),
+            return match queryresult.rows_affected() {
+                1 => (StatusCode::OK, Json(task)),
+                _ => (StatusCode::NOT_FOUND, Json(task)),
             };
         }
         Err(e) => {
@@ -185,10 +185,10 @@ pub async fn delete_task(
         .await
     {
         Ok(queryresult) => {
-            match queryresult.rows_affected() {
-                1 => return (StatusCode::OK, Json(json!({"msg": "Task Deleted"}))),
+            return match queryresult.rows_affected() {
+                1 => (StatusCode::OK, Json(json!({"msg": "Task Deleted"}))),
                 _ => {
-                    return (
+                    (
                         StatusCode::NOT_FOUND,
                         Json(json!({"msg": "task not found"})),
                     )
