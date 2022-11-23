@@ -58,7 +58,7 @@ pub async fn new_task(
     let sql = "INSERT INTO task (task) values ($1) RETURNING *";
 
     let result: Result<task::Task, sqlx::Error> =
-        sqlx::query_as(&sql).bind(&task.task).fetch_one(&pool).await;
+        sqlx::query_as(sql).bind(&task.task).fetch_one(&pool).await;
 
     match result {
         Ok(taskwithid) => (
@@ -148,12 +148,10 @@ pub async fn update_task(
         .execute(&pool)
         .await
     {
-        Ok(queryresult) => {
-            return match queryresult.rows_affected() {
-                1 => (StatusCode::OK, Json(task)),
-                _ => (StatusCode::NOT_FOUND, Json(task)),
-            };
-        }
+        Ok(queryresult) => match queryresult.rows_affected() {
+            1 => (StatusCode::OK, Json(task)),
+            _ => (StatusCode::NOT_FOUND, Json(task)),
+        },
         Err(e) => {
             tracing::error!("could not find task with id: {:?} error: {:?}", id, e);
             (StatusCode::NOT_FOUND, Json(task))
@@ -184,17 +182,13 @@ pub async fn delete_task(
         .execute(&pool)
         .await
     {
-        Ok(queryresult) => {
-            return match queryresult.rows_affected() {
-                1 => (StatusCode::OK, Json(json!({"msg": "Task Deleted"}))),
-                _ => {
-                    (
-                        StatusCode::NOT_FOUND,
-                        Json(json!({"msg": "task not found"})),
-                    )
-                }
-            };
-        }
+        Ok(queryresult) => match queryresult.rows_affected() {
+            1 => (StatusCode::OK, Json(json!({"msg": "Task Deleted"}))),
+            _ => (
+                StatusCode::NOT_FOUND,
+                Json(json!({"msg": "task not found"})),
+            ),
+        },
         Err(e) => {
             tracing::error!("could not find task with id: {:?} error: {:?}", id, e);
             (

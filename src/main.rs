@@ -39,9 +39,9 @@ extern crate lazy_static;
 
 
 lazy_static! {    
-    pub static ref DATABASE_URL: String = env::var("DATABASE_URL").unwrap_or(if cfg!(test) {
+    pub static ref DATABASE_URL: String = env::var("DATABASE_URL").unwrap_or_else(|_| if cfg!(test) {
         "sqlite:testtasks.db"
-    } else {
+     } else {
         "sqlite:tasks.db"
     }.to_string());
 }
